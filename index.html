@@ -36,20 +36,22 @@
         .loading-overlay {
             position: fixed;
             inset: 0;
-            background: rgba(255,255,255,0.8);
+            background: rgba(255,255,255,0.9);
             display: flex;
             justify-content: center;
             align-items: center;
             z-index: 1000;
+            transition: opacity 0.5s ease;
         }
     </style>
 </head>
 <body class="text-slate-800">
 
     <div id="loader" class="loading-overlay">
-        <div class="flex flex-col items-center">
-            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-900 mb-2"></div>
-            <p class="text-blue-900 font-medium">Connecting to Database...</p>
+        <div class="flex flex-col items-center p-6 text-center">
+            <div id="loader-spinner" class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-900 mb-4"></div>
+            <p id="loader-text" class="text-blue-900 font-medium">Connecting to Database...</p>
+            <p id="loader-error" class="hidden text-red-600 mt-2 text-sm max-w-xs">It's taking longer than usual. Please check your Firebase configuration in the code.</p>
         </div>
     </div>
 
@@ -195,42 +197,45 @@
     </div>
 
     <script type="module">
-  // Import the functions you need from the SDKs you need
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-app.js";
-  import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-analytics.js";
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        /** * DEPLOYMENT INSTRUCTIONS:
-         * 1. Go to your Firebase Console (console.firebase.google.com).
-         * 2. Go to Project Settings > General.
-         * 3. Scroll down to "Your apps" and copy the firebaseConfig object.
-         * 4. Paste it into the 'manualConfig' variable below.
-         */
+        // ==========================================================
+        // STEP 1: PASTE YOUR FIREBASE CONFIG HERE
+        // ==========================================================
         const firebaseConfig = {
-    apiKey: "AIzaSyBzywENZg1oudhppkhqf0Rlw84oiVoc8ow",
-    authDomain: "trymar-5672a.firebaseapp.com",
-    projectId: "trymar-5672a",
-    storageBucket: "trymar-5672a.firebasestorage.app",
-    messagingSenderId: "860261873067",
-    appId: "1:860261873067:web:e285e1de09499a1ba44eee",
-    measurementId: "G-BX892FVM4M"
-  };
+  apiKey: "AIzaSyBzywENZg1oudhppkhqf0Rlw84oiVoc8ow",
+  authDomain: "trymar-5672a.firebaseapp.com",
+  projectId: "trymar-5672a",
+  storageBucket: "trymar-5672a.firebasestorage.app",
+  messagingSenderId: "860261873067",
+  appId: "1:860261873067:web:e285e1de09499a1ba44eee",
+  measurementId: "G-BX892FVM4M"
+};
+        // ==========================================================
 
-        // Automatic config detection (works in Canvas, falls back to manual for GitHub)
         const firebaseConfig = typeof __firebase_config !== 'undefined' 
             ? JSON.parse(__firebase_config) 
             : manualConfig;
+
+        // Failsafe: If manualConfig hasn't been updated, show alert after 8 seconds
+        const loaderTimeout = setTimeout(() => {
+            if (manualConfig.apiKey === "AIzaSyBzywENZg1oudhppkhqf0Rlw84oiVoc8ow" && typeof __firebase_config === 'undefined') {
+                document.getElementById('loader-spinner').classList.add('hidden');
+                document.getElementById('loader-text').innerText = "Configuration Required";
+                document.getElementById('loader-error').classList.remove('hidden');
+            }
+        }, 8000);
 
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'marsu-gym-prod';
 
-        // State
         let events = [];
         let currentTab = 'public';
         let unsubscribeEvents = null;
-
-        // --- Database Logic ---
 
         async function initAuth() {
             try {
@@ -240,37 +245,39 @@
                     await signInAnonymously(auth);
                 }
             } catch (error) {
-                console.error("Auth failed:", error);
-                showToast("Connection failed. Please update your Firebase Config.");
+                console.error("Auth error:", error);
+                showToast("Connection failed. Check Firebase setup.");
             }
         }
 
         onAuthStateChanged(auth, (user) => {
             if (user) {
+                clearTimeout(loaderTimeout);
                 setupFirestoreListeners(user);
-            } else {
-                if (unsubscribeEvents) unsubscribeEvents();
             }
         });
 
         function setupFirestoreListeners(user) {
-            if (!user) return;
             const q = collection(db, 'artifacts', appId, 'public', 'data', 'events');
-            
             if (unsubscribeEvents) unsubscribeEvents();
 
             unsubscribeEvents = onSnapshot(q, (snapshot) => {
                 events = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 renderUI();
-                document.getElementById('loader').classList.add('hidden');
+                
+                // Hide loader
+                const loader = document.getElementById('loader');
+                loader.style.opacity = '0';
+                setTimeout(() => loader.classList.add('hidden'), 500);
             }, (error) => {
                 console.error("Firestore error:", error);
                 if (error.code === 'permission-denied') {
-                    showToast("Access Denied. Ensure Firestore rules allow access.");
+                    showToast("Permission denied. Check Firestore rules.");
                 }
             });
         }
 
+        // --- Functions ---
         async function saveEvent(data) {
             if (!auth.currentUser) return;
             const btn = document.getElementById('submit-btn');
@@ -291,9 +298,8 @@
                 }
                 closeModal();
                 showToast("Event saved successfully!");
-            } catch (error) {
-                console.error("Save error:", error);
-                showToast("Failed to save event.");
+            } catch (e) {
+                showToast("Error saving event.");
             } finally {
                 btn.disabled = false;
                 btn.innerText = "Save Event";
@@ -302,17 +308,15 @@
 
         async function removeEvent(id) {
             if (!auth.currentUser) return;
-            if (confirm("Permanently delete this event?")) {
+            if (confirm("Delete this event?")) {
                 try {
                     await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'events', id));
-                    showToast("Event removed.");
-                } catch (error) {
-                    showToast("Deletion failed.");
+                    showToast("Event deleted.");
+                } catch (e) {
+                    showToast("Delete failed.");
                 }
             }
         }
-
-        // --- UI Rendering ---
 
         window.renderUI = function() {
             if (currentTab === 'public') renderPublicView();
@@ -331,20 +335,18 @@
             }).sort((a, b) => new Date(a.date) - new Date(b.date));
 
             if (filtered.length === 0) {
-                container.innerHTML = `<div class="col-span-full py-20 text-center text-slate-500">No events found.</div>`;
+                container.innerHTML = `<div class="col-span-full py-12 text-center text-slate-400">No events found.</div>`;
                 return;
             }
 
             container.innerHTML = filtered.map(e => `
-                <div class="glass-card rounded-2xl p-6 shadow-md hover:shadow-xl transition-all group">
-                    <div class="flex justify-between items-start mb-4">
-                        <span class="status-badge ${getTypeColor(e.type)}">${e.type}</span>
-                    </div>
-                    <h3 class="text-xl font-bold text-slate-900 mb-2">${e.title}</h3>
-                    <p class="text-sm text-slate-600 mb-4 line-clamp-2">${e.desc || 'No details.'}</p>
-                    <div class="space-y-2 pt-4 border-t border-slate-100 text-sm text-slate-500">
-                        <div><i class="far fa-clock w-5 text-blue-500"></i> ${formatDate(e.date)} at ${formatTime(e.time)}</div>
-                        <div><i class="far fa-user w-5 text-blue-500"></i> ${e.organizer}</div>
+                <div class="glass-card rounded-xl p-6 shadow-sm hover:shadow-md transition-all">
+                    <span class="status-badge ${getTypeColor(e.type)} mb-3 inline-block">${e.type}</span>
+                    <h3 class="text-xl font-bold text-slate-900 mb-1">${e.title}</h3>
+                    <p class="text-sm text-slate-500 mb-4">${e.desc || ''}</p>
+                    <div class="text-xs text-slate-500 space-y-1">
+                        <div><i class="far fa-calendar-alt mr-2"></i>${formatDate(e.date)} at ${formatTime(e.time)}</div>
+                        <div><i class="far fa-user mr-2"></i>${e.organizer}</div>
                     </div>
                 </div>
             `).join('');
@@ -353,14 +355,14 @@
         function renderAdminTable() {
             const tbody = document.getElementById('admin-table-body');
             tbody.innerHTML = events.sort((a, b) => new Date(a.date) - new Date(b.date)).map(e => `
-                <tr class="border-b border-slate-100 hover:bg-slate-50">
-                    <td class="px-6 py-4 font-medium text-slate-900">${e.title}</td>
-                    <td class="px-6 py-4 text-slate-600 text-sm">${e.date} at ${e.time}</td>
-                    <td class="px-6 py-4 text-slate-600">${e.organizer}</td>
-                    <td class="px-6 py-4"><span class="status-badge ${getTypeColor(e.type)}">${e.type}</span></td>
+                <tr class="border-b border-slate-100">
+                    <td class="px-6 py-4 font-medium">${e.title}</td>
+                    <td class="px-6 py-4 text-sm">${e.date} ${e.time}</td>
+                    <td class="px-6 py-4 text-sm">${e.organizer}</td>
+                    <td class="px-6 py-4"><span class="status-badge ${getTypeColor(e.type)} text-[10px]">${e.type}</span></td>
                     <td class="px-6 py-4 text-right">
-                        <button onclick="openModal('${e.id}')" class="p-2 text-blue-600"><i class="fas fa-edit"></i></button>
-                        <button onclick="removeEvent('${e.id}')" class="p-2 text-red-600"><i class="fas fa-trash"></i></button>
+                        <button onclick="openModal('${e.id}')" class="text-blue-600 mr-3"><i class="fas fa-edit"></i></button>
+                        <button onclick="removeEvent('${e.id}')" class="text-red-600"><i class="fas fa-trash"></i></button>
                     </td>
                 </tr>
             `).join('');
@@ -372,36 +374,36 @@
             document.getElementById('view-admin').classList.toggle('hidden', tab !== 'admin');
             document.getElementById('btn-public').classList.toggle('bg-blue-800', tab === 'public');
             document.getElementById('btn-admin').classList.toggle('bg-blue-800', tab === 'admin');
-            document.getElementById('page-title').innerText = tab === 'admin' ? "Admin Dashboard" : "Gymnasium Schedule";
+            document.getElementById('page-title').innerText = tab === 'admin' ? "Admin Portal" : "Gymnasium Schedule";
             renderUI();
         };
 
-        window.openModal = (editId = null) => {
-            const modal = document.getElementById('event-modal');
+        window.openModal = (id = null) => {
             const form = document.getElementById('event-form');
             form.reset();
             document.getElementById('edit-id').value = '';
-            if (editId) {
-                const event = events.find(e => e.id === editId);
-                if (event) {
-                    document.getElementById('edit-id').value = event.id;
-                    document.getElementById('form-title').value = event.title;
-                    document.getElementById('form-date').value = event.date;
-                    document.getElementById('form-time').value = event.time;
-                    document.getElementById('form-organizer').value = event.organizer;
-                    document.getElementById('form-type').value = event.type;
-                    document.getElementById('form-desc').value = event.desc;
+            if (id) {
+                const e = events.find(item => item.id === id);
+                if (e) {
+                    document.getElementById('edit-id').value = e.id;
+                    document.getElementById('form-title').value = e.title;
+                    document.getElementById('form-date').value = e.date;
+                    document.getElementById('form-time').value = e.time;
+                    document.getElementById('form-organizer').value = e.organizer;
+                    document.getElementById('form-type').value = e.type;
+                    document.getElementById('form-desc').value = e.desc;
                 }
             }
-            modal.classList.remove('hidden');
+            document.getElementById('event-modal').classList.remove('hidden');
         };
 
         window.closeModal = () => document.getElementById('event-modal').classList.add('hidden');
+        window.removeEvent = removeEvent;
 
         document.getElementById('event-form').onsubmit = (e) => {
             e.preventDefault();
-            const id = document.getElementById('edit-id').value;
             const data = {
+                id: document.getElementById('edit-id').value,
                 title: document.getElementById('form-title').value,
                 date: document.getElementById('form-date').value,
                 time: document.getElementById('form-time').value,
@@ -409,33 +411,21 @@
                 type: document.getElementById('form-type').value,
                 desc: document.getElementById('form-desc').value
             };
-            if (id) data.id = id;
             saveEvent(data);
         };
 
-        function showToast(msg) {
-            const toast = document.getElementById('toast');
-            document.getElementById('toast-msg').innerText = msg;
-            toast.classList.remove('translate-y-20', 'opacity-0');
-            setTimeout(() => toast.classList.add('translate-y-20', 'opacity-0'), 3000);
+        function getTypeColor(t) {
+            const map = { 'Sports': 'bg-green-100 text-green-700', 'Ceremony': 'bg-purple-100 text-purple-700', 'Concert': 'bg-pink-100 text-pink-700', 'Practice': 'bg-amber-100 text-amber-700' };
+            return map[t] || 'bg-slate-100 text-slate-700';
         }
 
-        function getTypeColor(type) {
-            const colors = { 'Sports': 'bg-green-100 text-green-700', 'Ceremony': 'bg-purple-100 text-purple-700', 'Concert': 'bg-pink-100 text-pink-700', 'Practice': 'bg-amber-100 text-amber-700' };
-            return colors[type] || 'bg-slate-100 text-slate-700';
-        }
-
-        function formatDate(dateStr) {
-            const d = new Date(dateStr);
-            return isNaN(d.getTime()) ? dateStr : d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
-        }
-
-        function formatTime(timeStr) {
-            const parts = timeStr.split(':');
-            if (parts.length < 2) return timeStr;
-            const hours = parseInt(parts[0]);
-            const period = hours >= 12 ? 'PM' : 'AM';
-            return `${hours % 12 || 12}:${parts[1]} ${period}`;
+        function formatDate(s) { const d = new Date(s); return isNaN(d) ? s : d.toLocaleDateString(); }
+        function formatTime(s) { return s; }
+        function showToast(m) {
+            const t = document.getElementById('toast');
+            document.getElementById('toast-msg').innerText = m;
+            t.classList.remove('translate-y-20', 'opacity-0');
+            setTimeout(() => t.classList.add('translate-y-20', 'opacity-0'), 3000);
         }
 
         initAuth();

@@ -195,9 +195,9 @@
     </div>
 
     <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+  // Import the functions you need from the SDKs you need
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-app.js";
+  import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-analytics.js";
 
         /** * DEPLOYMENT INSTRUCTIONS:
          * 1. Go to your Firebase Console (console.firebase.google.com).
@@ -206,14 +206,14 @@
          * 4. Paste it into the 'manualConfig' variable below.
          */
         const firebaseConfig = {
-  apiKey: "AIzaSyAfFhWPlerYT80c5au3E42vfk9WhM81j60",
-  authDomain: "marsuuuuuuuu-4f3d1.firebaseapp.com",
-  projectId: "marsuuuuuuuu-4f3d1",
-  storageBucket: "marsuuuuuuuu-4f3d1.firebasestorage.app",
-  messagingSenderId: "536720714224",
-  appId: "1:536720714224:web:447d1cd2b4276817875535",
-  measurementId: "G-63BM537J3F"
-};
+    apiKey: "AIzaSyBzywENZg1oudhppkhqf0Rlw84oiVoc8ow",
+    authDomain: "trymar-5672a.firebaseapp.com",
+    projectId: "trymar-5672a",
+    storageBucket: "trymar-5672a.firebasestorage.app",
+    messagingSenderId: "860261873067",
+    appId: "1:860261873067:web:e285e1de09499a1ba44eee",
+    measurementId: "G-BX892FVM4M"
+  };
 
         // Automatic config detection (works in Canvas, falls back to manual for GitHub)
         const firebaseConfig = typeof __firebase_config !== 'undefined' 

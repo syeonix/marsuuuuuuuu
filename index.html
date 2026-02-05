@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Marsu Gymnasium | Event Management System</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8fafc;
+        }
+
+        .glass-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(226, 232, 240, 0.8);
+        }
+
+        .event-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .status-badge {
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .loading-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(255,255,255,0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+    </style>
+</head>
+<body class="text-slate-800">
+
+    <div id="loader" class="loading-overlay">
+        <div class="flex flex-col items-center">
+            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-900 mb-2"></div>
+            <p class="text-blue-900 font-medium">Connecting to Database...</p>
+        </div>
+    </div>
+
+    <!-- Navigation -->
+    <nav class="bg-blue-900 text-white shadow-lg sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16 items-center">
+                <div class="flex items-center space-x-3">
+                    <div class="bg-white p-1.5 rounded-lg">
+                        <i class="fas fa-dumbbell text-blue-900 text-xl"></i>
+                    </div>
+                    <span class="font-bold text-xl tracking-tight uppercase">Marsu Gym</span>
+                </div>
+                <div class="flex space-x-4">
+                    <button onclick="switchTab('public')" id="btn-public" class="px-4 py-2 rounded-md bg-blue-800 transition">Public Schedule</button>
+                    <button onclick="switchTab('admin')" id="btn-admin" class="px-4 py-2 rounded-md hover:bg-blue-800 transition">Admin Portal</button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Header -->
+    <header class="bg-white border-b border-slate-200 py-8">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <h1 id="page-title" class="text-3xl font-extrabold text-slate-900">Gymnasium Schedule</h1>
+            <p id="page-subtitle" class="text-slate-500 mt-2">Real-time official events for the Marsu Central Gymnasium.</p>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        
+        <!-- Public View -->
+        <section id="view-public" class="space-y-6">
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+                <div class="relative flex-1">
+                    <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                    <input type="text" id="search-events" placeholder="Search events..." class="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition" oninput="renderUI()">
+                </div>
+                <div class="flex gap-2">
+                    <select id="filter-type" class="px-4 py-2 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500" onchange="renderUI()">
+                        <option value="all">All Types</option>
+                        <option value="Sports">Sports</option>
+                        <option value="Ceremony">Ceremony</option>
+                        <option value="Concert">Concert</option>
+                        <option value="Practice">Practice</option>
+                    </select>
+                </div>
+            </div>
+
+            <div id="events-container" class="event-grid">
+                <!-- Events will be injected here -->
+            </div>
+        </section>
+
+        <!-- Admin View -->
+        <section id="view-admin" class="hidden space-y-6">
+            <div class="flex justify-between items-center">
+                <h2 class="text-xl font-semibold">Manage Reservations</h2>
+                <button onclick="openModal()" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium transition flex items-center space-x-2">
+                    <i class="fas fa-plus"></i>
+                    <span>New Event</span>
+                </button>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-x-auto">
+                <table class="w-full text-left min-w-[600px]">
+                    <thead class="bg-slate-50 border-b border-slate-200">
+                        <tr>
+                            <th class="px-6 py-4 font-semibold text-slate-600">Event Name</th>
+                            <th class="px-6 py-4 font-semibold text-slate-600">Date & Time</th>
+                            <th class="px-6 py-4 font-semibold text-slate-600">Organizer</th>
+                            <th class="px-6 py-4 font-semibold text-slate-600">Type</th>
+                            <th class="px-6 py-4 font-semibold text-slate-600 text-right">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="admin-table-body">
+                        <!-- Admin rows will be injected here -->
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </main>
+
+    <!-- Modal Form -->
+    <div id="event-modal" class="fixed inset-0 z-[60] hidden overflow-y-auto">
+        <div class="flex items-center justify-center min-h-screen p-4">
+            <div class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm" onclick="closeModal()"></div>
+            <div class="relative bg-white w-full max-w-lg rounded-2xl shadow-2xl p-8">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 id="modal-title" class="text-2xl font-bold text-slate-900">Add New Event</h3>
+                    <button onclick="closeModal()" class="text-slate-400 hover:text-slate-600 transition">
+                        <i class="fas fa-times text-xl"></i>
+                    </button>
+                </div>
+                
+                <form id="event-form" class="space-y-4">
+                    <input type="hidden" id="edit-id">
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Event Title</label>
+                        <input type="text" id="form-title" required class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-1">Date</label>
+                            <input type="date" id="form-date" required class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-1">Time</label>
+                            <input type="time" id="form-time" required class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Organizer</label>
+                        <input type="text" id="form-organizer" required class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Event Type</label>
+                        <select id="form-type" class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+                            <option value="Sports">Sports</option>
+                            <option value="Ceremony">Ceremony</option>
+                            <option value="Concert">Concert</option>
+                            <option value="Practice">Practice</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Description</label>
+                        <textarea id="form-desc" rows="3" class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"></textarea>
+                    </div>
+                    
+                    <div class="flex gap-3 pt-4">
+                        <button type="button" onclick="closeModal()" class="flex-1 px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 transition font-medium">Cancel</button>
+                        <button type="submit" id="submit-btn" class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium">Save Event</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Message Box UI -->
+    <div id="toast" class="fixed bottom-5 right-5 z-[100] transform translate-y-20 transition-transform duration-300 bg-slate-900 text-white px-6 py-3 rounded-xl shadow-2xl flex items-center space-x-3 pointer-events-none opacity-0">
+        <i class="fas fa-check-circle text-green-400"></i>
+        <span id="toast-msg">Action successful!</span>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Firebase Configuration
+        const firebaseConfig = JSON.parse(__firebase_config);
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'marsu-gym-default';
+
+        // State
+        let events = [];
+        let currentTab = 'public';
+        let unsubscribeEvents = null;
+
+        // --- Database Logic ---
+
+        async function initAuth() {
+            try {
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+            } catch (error) {
+                console.error("Auth failed:", error);
+                showToast("Connection failed. Check your internet.");
+            }
+        }
+
+        // Listen for Auth changes and THEN setup Firestore listeners (Rule 3)
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                setupFirestoreListeners(user);
+            } else {
+                if (unsubscribeEvents) unsubscribeEvents();
+            }
+        });
+
+        function setupFirestoreListeners(user) {
+            if (!user) return;
+
+            // Subscribe to real-time updates (Rule 1: Strict Paths)
+            const q = collection(db, 'artifacts', appId, 'public', 'data', 'events');
+            
+            // Clean up old listener if exists
+            if (unsubscribeEvents) unsubscribeEvents();
+
+            unsubscribeEvents = onSnapshot(q, (snapshot) => {
+                events = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                renderUI();
+                document.getElementById('loader').classList.add('hidden');
+            }, (error) => {
+                console.error("Firestore error:", error);
+                // Usually permissions error if auth wasn't ready or path is wrong
+                if (error.code === 'permission-denied') {
+                    showToast("Access Denied. Authenticating...");
+                }
+            });
+        }
+
+        async function saveEvent(data) {
+            if (!auth.currentUser) {
+                showToast("Not authenticated.");
+                return;
+            }
+
+            const btn = document.getElementById('submit-btn');
+            btn.disabled = true;
+            btn.innerText = "Saving...";
+
+            try {
+                if (data.id) {
+                    const eventRef = doc(db, 'artifacts', appId, 'public', 'data', 'events', data.id);
+                    const updateData = { ...data };
+                    delete updateData.id;
+                    await updateDoc(eventRef, updateData);
+                } else {
+                    await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'events'), {
+                        ...data,
+                        createdAt: serverTimestamp()
+                    });
+                }
+                closeModal();
+                showToast("Event saved successfully!");
+            } catch (error) {
+                console.error("Save error:", error);
+                showToast("Failed to save event.");
+            } finally {
+                btn.disabled = false;
+                btn.innerText = "Save Event";
+            }
+        }
+
+        async function removeEvent(id) {
+            if (!auth.currentUser) return;
+            if (confirm("Permanently delete this event from the database?")) {
+                try {
+                    await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'events', id));
+                    showToast("Event removed.");
+                } catch (error) {
+                    showToast("Deletion failed.");
+                }
+            }
+        }
+
+        // --- UI Rendering ---
+
+        window.renderUI = function() {
+            if (currentTab === 'public') renderPublicView();
+            else renderAdminTable();
+        };
+
+        function renderPublicView() {
+            const container = document.getElementById('events-container');
+            const search = document.getElementById('search-events').value.toLowerCase();
+            const filter = document.getElementById('filter-type').value;
+
+            // Rule 2: Filter in memory
+            const filtered = events.filter(e => {
+                const matchesSearch = e.title?.toLowerCase().includes(search) || e.organizer?.toLowerCase().includes(search);
+                const matchesFilter = filter === 'all' || e.type === filter;
+                return matchesSearch && matchesFilter;
+            }).sort((a, b) => new Date(a.date) - new Date(b.date));
+
+            if (filtered.length === 0) {
+                container.innerHTML = `
+                    <div class="col-span-full py-20 text-center">
+                        <i class="fas fa-calendar-times text-5xl text-slate-200 mb-4"></i>
+                        <p class="text-slate-500">No events scheduled.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = filtered.map(e => `
+                <div class="glass-card rounded-2xl p-6 shadow-md hover:shadow-xl transition-all duration-300 group">
+                    <div class="flex justify-between items-start mb-4">
+                        <span class="status-badge ${getTypeColor(e.type)}">${e.type}</span>
+                        <div class="text-slate-400 group-hover:text-blue-600 transition">
+                            <i class="far fa-calendar-alt"></i>
+                        </div>
+                    </div>
+                    <h3 class="text-xl font-bold text-slate-900 mb-2">${e.title}</h3>
+                    <p class="text-sm text-slate-600 mb-4 line-clamp-2">${e.desc || 'No details.'}</p>
+                    <div class="space-y-2 pt-4 border-t border-slate-100">
+                        <div class="flex items-center text-sm text-slate-500">
+                            <i class="far fa-clock w-5 text-blue-500"></i>
+                            <span>${formatDate(e.date)} at ${formatTime(e.time)}</span>
+                        </div>
+                        <div class="flex items-center text-sm text-slate-500">
+                            <i class="far fa-user w-5 text-blue-500"></i>
+                            <span>${e.organizer}</span>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function renderAdminTable() {
+            const tbody = document.getElementById('admin-table-body');
+            tbody.innerHTML = events.sort((a, b) => new Date(a.date) - new Date(b.date)).map(e => `
+                <tr class="border-b border-slate-100 hover:bg-slate-50 transition">
+                    <td class="px-6 py-4 font-medium text-slate-900">${e.title}</td>
+                    <td class="px-6 py-4 text-slate-600 text-sm">
+                        ${e.date} <br> <span class="text-blue-500 font-semibold">${e.time}</span>
+                    </td>
+                    <td class="px-6 py-4 text-slate-600">${e.organizer}</td>
+                    <td class="px-6 py-4">
+                        <span class="status-badge ${getTypeColor(e.type)} text-[10px]">${e.type}</span>
+                    </td>
+                    <td class="px-6 py-4 text-right">
+                        <div class="flex justify-end space-x-1">
+                            <button onclick="openModal('${e.id}')" class="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button onclick="removeEvent('${e.id}')" class="p-2 text-red-600 hover:bg-red-50 rounded-lg transition">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        // --- UI Interactions ---
+
+        window.switchTab = function(tab) {
+            currentTab = tab;
+            const publicView = document.getElementById('view-public');
+            const adminView = document.getElementById('view-admin');
+            const btnPublic = document.getElementById('btn-public');
+            const btnAdmin = document.getElementById('btn-admin');
+            const title = document.getElementById('page-title');
+
+            if (tab === 'admin') {
+                publicView.classList.add('hidden');
+                adminView.classList.remove('hidden');
+                btnAdmin.classList.add('bg-blue-800');
+                btnPublic.classList.remove('bg-blue-800');
+                title.innerText = "Admin Dashboard";
+            } else {
+                publicView.classList.remove('hidden');
+                adminView.classList.add('hidden');
+                btnPublic.classList.add('bg-blue-800');
+                btnAdmin.classList.remove('bg-blue-800');
+                title.innerText = "Gymnasium Schedule";
+            }
+            renderUI();
+        };
+
+        window.openModal = function(editId = null) {
+            const modal = document.getElementById('event-modal');
+            const form = document.getElementById('event-form');
+            const title = document.getElementById('modal-title');
+            
+            form.reset();
+            document.getElementById('edit-id').value = '';
+            title.innerText = "Create Event Entry";
+
+            if (editId) {
+                const event = events.find(e => e.id === editId);
+                if (event) {
+                    document.getElementById('edit-id').value = event.id;
+                    document.getElementById('form-title').value = event.title;
+                    document.getElementById('form-date').value = event.date;
+                    document.getElementById('form-time').value = event.time;
+                    document.getElementById('form-organizer').value = event.organizer;
+                    document.getElementById('form-type').value = event.type;
+                    document.getElementById('form-desc').value = event.desc;
+                    title.innerText = "Edit Event Entry";
+                }
+            }
+
+            modal.classList.remove('hidden');
+            document.body.style.overflow = 'hidden';
+        }
+
+        window.closeModal = function() {
+            document.getElementById('event-modal').classList.add('hidden');
+            document.body.style.overflow = 'auto';
+        }
+
+        window.removeEvent = removeEvent;
+
+        // Form Submit
+        document.getElementById('event-form').onsubmit = (e) => {
+            e.preventDefault();
+            const id = document.getElementById('edit-id').value;
+            const data = {
+                title: document.getElementById('form-title').value,
+                date: document.getElementById('form-date').value,
+                time: document.getElementById('form-time').value,
+                organizer: document.getElementById('form-organizer').value,
+                type: document.getElementById('form-type').value,
+                desc: document.getElementById('form-desc').value
+            };
+            if (id) data.id = id;
+            saveEvent(data);
+        };
+
+        // Formatters
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            document.getElementById('toast-msg').innerText = msg;
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            setTimeout(() => toast.classList.add('translate-y-20', 'opacity-0'), 3000);
+        }
+
+        function getTypeColor(type) {
+            const colors = {
+                'Sports': 'bg-green-100 text-green-700',
+                'Ceremony': 'bg-purple-100 text-purple-700',
+                'Concert': 'bg-pink-100 text-pink-700',
+                'Practice': 'bg-amber-100 text-amber-700'
+            };
+            return colors[type] || 'bg-slate-100 text-slate-700';
+        }
+
+        function formatDate(dateStr) {
+            if(!dateStr) return "N/A";
+            const options = { month: 'short', day: 'numeric', year: 'numeric' };
+            const d = new Date(dateStr);
+            return isNaN(d.getTime()) ? dateStr : d.toLocaleDateString(undefined, options);
+        }
+
+        function formatTime(timeStr) {
+            if(!timeStr) return "N/A";
+            const parts = timeStr.split(':');
+            if (parts.length < 2) return timeStr;
+            const hours = parseInt(parts[0]);
+            const minutes = parts[1];
+            const period = hours >= 12 ? 'PM' : 'AM';
+            const h = hours % 12 || 12;
+            return `${h}:${minutes} ${period}`;
+        }
+
+        initAuth();
+    </script>
+</body>
+</html>

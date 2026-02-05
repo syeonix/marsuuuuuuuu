@@ -199,12 +199,31 @@
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // Firebase Configuration
-        const firebaseConfig = JSON.parse(__firebase_config);
+        /** * DEPLOYMENT INSTRUCTIONS:
+         * 1. Go to your Firebase Console (console.firebase.google.com).
+         * 2. Go to Project Settings > General.
+         * 3. Scroll down to "Your apps" and copy the firebaseConfig object.
+         * 4. Paste it into the 'manualConfig' variable below.
+         */
+        const firebaseConfig = {
+  apiKey: "AIzaSyAfFhWPlerYT80c5au3E42vfk9WhM81j60",
+  authDomain: "marsuuuuuuuu-4f3d1.firebaseapp.com",
+  projectId: "marsuuuuuuuu-4f3d1",
+  storageBucket: "marsuuuuuuuu-4f3d1.firebasestorage.app",
+  messagingSenderId: "536720714224",
+  appId: "1:536720714224:web:447d1cd2b4276817875535",
+  measurementId: "G-63BM537J3F"
+};
+
+        // Automatic config detection (works in Canvas, falls back to manual for GitHub)
+        const firebaseConfig = typeof __firebase_config !== 'undefined' 
+            ? JSON.parse(__firebase_config) 
+            : manualConfig;
+
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'marsu-gym-default';
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'marsu-gym-prod';
 
         // State
         let events = [];
@@ -222,11 +241,10 @@
                 }
             } catch (error) {
                 console.error("Auth failed:", error);
-                showToast("Connection failed. Check your internet.");
+                showToast("Connection failed. Please update your Firebase Config.");
             }
         }
 
-        // Listen for Auth changes and THEN setup Firestore listeners (Rule 3)
         onAuthStateChanged(auth, (user) => {
             if (user) {
                 setupFirestoreListeners(user);
@@ -237,11 +255,8 @@
 
         function setupFirestoreListeners(user) {
             if (!user) return;
-
-            // Subscribe to real-time updates (Rule 1: Strict Paths)
             const q = collection(db, 'artifacts', appId, 'public', 'data', 'events');
             
-            // Clean up old listener if exists
             if (unsubscribeEvents) unsubscribeEvents();
 
             unsubscribeEvents = onSnapshot(q, (snapshot) => {
@@ -250,19 +265,14 @@
                 document.getElementById('loader').classList.add('hidden');
             }, (error) => {
                 console.error("Firestore error:", error);
-                // Usually permissions error if auth wasn't ready or path is wrong
                 if (error.code === 'permission-denied') {
-                    showToast("Access Denied. Authenticating...");
+                    showToast("Access Denied. Ensure Firestore rules allow access.");
                 }
             });
         }
 
         async function saveEvent(data) {
-            if (!auth.currentUser) {
-                showToast("Not authenticated.");
-                return;
-            }
-
+            if (!auth.currentUser) return;
             const btn = document.getElementById('submit-btn');
             btn.disabled = true;
             btn.innerText = "Saving...";
@@ -292,7 +302,7 @@
 
         async function removeEvent(id) {
             if (!auth.currentUser) return;
-            if (confirm("Permanently delete this event from the database?")) {
+            if (confirm("Permanently delete this event?")) {
                 try {
                     await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'events', id));
                     showToast("Event removed.");
@@ -314,7 +324,6 @@
             const search = document.getElementById('search-events').value.toLowerCase();
             const filter = document.getElementById('filter-type').value;
 
-            // Rule 2: Filter in memory
             const filtered = events.filter(e => {
                 const matchesSearch = e.title?.toLowerCase().includes(search) || e.organizer?.toLowerCase().includes(search);
                 const matchesFilter = filter === 'all' || e.type === filter;
@@ -322,34 +331,20 @@
             }).sort((a, b) => new Date(a.date) - new Date(b.date));
 
             if (filtered.length === 0) {
-                container.innerHTML = `
-                    <div class="col-span-full py-20 text-center">
-                        <i class="fas fa-calendar-times text-5xl text-slate-200 mb-4"></i>
-                        <p class="text-slate-500">No events scheduled.</p>
-                    </div>
-                `;
+                container.innerHTML = `<div class="col-span-full py-20 text-center text-slate-500">No events found.</div>`;
                 return;
             }
 
             container.innerHTML = filtered.map(e => `
-                <div class="glass-card rounded-2xl p-6 shadow-md hover:shadow-xl transition-all duration-300 group">
+                <div class="glass-card rounded-2xl p-6 shadow-md hover:shadow-xl transition-all group">
                     <div class="flex justify-between items-start mb-4">
                         <span class="status-badge ${getTypeColor(e.type)}">${e.type}</span>
-                        <div class="text-slate-400 group-hover:text-blue-600 transition">
-                            <i class="far fa-calendar-alt"></i>
-                        </div>
                     </div>
                     <h3 class="text-xl font-bold text-slate-900 mb-2">${e.title}</h3>
                     <p class="text-sm text-slate-600 mb-4 line-clamp-2">${e.desc || 'No details.'}</p>
-                    <div class="space-y-2 pt-4 border-t border-slate-100">
-                        <div class="flex items-center text-sm text-slate-500">
-                            <i class="far fa-clock w-5 text-blue-500"></i>
-                            <span>${formatDate(e.date)} at ${formatTime(e.time)}</span>
-                        </div>
-                        <div class="flex items-center text-sm text-slate-500">
-                            <i class="far fa-user w-5 text-blue-500"></i>
-                            <span>${e.organizer}</span>
-                        </div>
+                    <div class="space-y-2 pt-4 border-t border-slate-100 text-sm text-slate-500">
+                        <div><i class="far fa-clock w-5 text-blue-500"></i> ${formatDate(e.date)} at ${formatTime(e.time)}</div>
+                        <div><i class="far fa-user w-5 text-blue-500"></i> ${e.organizer}</div>
                     </div>
                 </div>
             `).join('');
@@ -358,64 +353,34 @@
         function renderAdminTable() {
             const tbody = document.getElementById('admin-table-body');
             tbody.innerHTML = events.sort((a, b) => new Date(a.date) - new Date(b.date)).map(e => `
-                <tr class="border-b border-slate-100 hover:bg-slate-50 transition">
+                <tr class="border-b border-slate-100 hover:bg-slate-50">
                     <td class="px-6 py-4 font-medium text-slate-900">${e.title}</td>
-                    <td class="px-6 py-4 text-slate-600 text-sm">
-                        ${e.date} <br> <span class="text-blue-500 font-semibold">${e.time}</span>
-                    </td>
+                    <td class="px-6 py-4 text-slate-600 text-sm">${e.date} at ${e.time}</td>
                     <td class="px-6 py-4 text-slate-600">${e.organizer}</td>
-                    <td class="px-6 py-4">
-                        <span class="status-badge ${getTypeColor(e.type)} text-[10px]">${e.type}</span>
-                    </td>
+                    <td class="px-6 py-4"><span class="status-badge ${getTypeColor(e.type)}">${e.type}</span></td>
                     <td class="px-6 py-4 text-right">
-                        <div class="flex justify-end space-x-1">
-                            <button onclick="openModal('${e.id}')" class="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition">
-                                <i class="fas fa-edit"></i>
-                            </button>
-                            <button onclick="removeEvent('${e.id}')" class="p-2 text-red-600 hover:bg-red-50 rounded-lg transition">
-                                <i class="fas fa-trash"></i>
-                            </button>
-                        </div>
+                        <button onclick="openModal('${e.id}')" class="p-2 text-blue-600"><i class="fas fa-edit"></i></button>
+                        <button onclick="removeEvent('${e.id}')" class="p-2 text-red-600"><i class="fas fa-trash"></i></button>
                     </td>
                 </tr>
             `).join('');
         }
 
-        // --- UI Interactions ---
-
-        window.switchTab = function(tab) {
+        window.switchTab = (tab) => {
             currentTab = tab;
-            const publicView = document.getElementById('view-public');
-            const adminView = document.getElementById('view-admin');
-            const btnPublic = document.getElementById('btn-public');
-            const btnAdmin = document.getElementById('btn-admin');
-            const title = document.getElementById('page-title');
-
-            if (tab === 'admin') {
-                publicView.classList.add('hidden');
-                adminView.classList.remove('hidden');
-                btnAdmin.classList.add('bg-blue-800');
-                btnPublic.classList.remove('bg-blue-800');
-                title.innerText = "Admin Dashboard";
-            } else {
-                publicView.classList.remove('hidden');
-                adminView.classList.add('hidden');
-                btnPublic.classList.add('bg-blue-800');
-                btnAdmin.classList.remove('bg-blue-800');
-                title.innerText = "Gymnasium Schedule";
-            }
+            document.getElementById('view-public').classList.toggle('hidden', tab !== 'public');
+            document.getElementById('view-admin').classList.toggle('hidden', tab !== 'admin');
+            document.getElementById('btn-public').classList.toggle('bg-blue-800', tab === 'public');
+            document.getElementById('btn-admin').classList.toggle('bg-blue-800', tab === 'admin');
+            document.getElementById('page-title').innerText = tab === 'admin' ? "Admin Dashboard" : "Gymnasium Schedule";
             renderUI();
         };
 
-        window.openModal = function(editId = null) {
+        window.openModal = (editId = null) => {
             const modal = document.getElementById('event-modal');
             const form = document.getElementById('event-form');
-            const title = document.getElementById('modal-title');
-            
             form.reset();
             document.getElementById('edit-id').value = '';
-            title.innerText = "Create Event Entry";
-
             if (editId) {
                 const event = events.find(e => e.id === editId);
                 if (event) {
@@ -426,22 +391,13 @@
                     document.getElementById('form-organizer').value = event.organizer;
                     document.getElementById('form-type').value = event.type;
                     document.getElementById('form-desc').value = event.desc;
-                    title.innerText = "Edit Event Entry";
                 }
             }
-
             modal.classList.remove('hidden');
-            document.body.style.overflow = 'hidden';
-        }
+        };
 
-        window.closeModal = function() {
-            document.getElementById('event-modal').classList.add('hidden');
-            document.body.style.overflow = 'auto';
-        }
+        window.closeModal = () => document.getElementById('event-modal').classList.add('hidden');
 
-        window.removeEvent = removeEvent;
-
-        // Form Submit
         document.getElementById('event-form').onsubmit = (e) => {
             e.preventDefault();
             const id = document.getElementById('edit-id').value;
@@ -457,7 +413,6 @@
             saveEvent(data);
         };
 
-        // Formatters
         function showToast(msg) {
             const toast = document.getElementById('toast');
             document.getElementById('toast-msg').innerText = msg;
@@ -466,31 +421,21 @@
         }
 
         function getTypeColor(type) {
-            const colors = {
-                'Sports': 'bg-green-100 text-green-700',
-                'Ceremony': 'bg-purple-100 text-purple-700',
-                'Concert': 'bg-pink-100 text-pink-700',
-                'Practice': 'bg-amber-100 text-amber-700'
-            };
+            const colors = { 'Sports': 'bg-green-100 text-green-700', 'Ceremony': 'bg-purple-100 text-purple-700', 'Concert': 'bg-pink-100 text-pink-700', 'Practice': 'bg-amber-100 text-amber-700' };
             return colors[type] || 'bg-slate-100 text-slate-700';
         }
 
         function formatDate(dateStr) {
-            if(!dateStr) return "N/A";
-            const options = { month: 'short', day: 'numeric', year: 'numeric' };
             const d = new Date(dateStr);
-            return isNaN(d.getTime()) ? dateStr : d.toLocaleDateString(undefined, options);
+            return isNaN(d.getTime()) ? dateStr : d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
         }
 
         function formatTime(timeStr) {
-            if(!timeStr) return "N/A";
             const parts = timeStr.split(':');
             if (parts.length < 2) return timeStr;
             const hours = parseInt(parts[0]);
-            const minutes = parts[1];
             const period = hours >= 12 ? 'PM' : 'AM';
-            const h = hours % 12 || 12;
-            return `${h}:${minutes} ${period}`;
+            return `${hours % 12 || 12}:${parts[1]} ${period}`;
         }
 
         initAuth();
